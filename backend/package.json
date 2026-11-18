@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test.cjs",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:coverage": "node scripts/test.cjs --coverage"
   },
   "keywords": [],
   "author": "",
@@ -42,5 +43,11 @@
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.73.0"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true,
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true,
+    "esbuild@0.28.2": true
   }
 }

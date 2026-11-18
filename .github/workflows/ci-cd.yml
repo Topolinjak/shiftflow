@@ -114,3 +114,81 @@ jobs:
             backend/package-lock.json
           if-no-files-found: error
           retention-days: 7
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+
+    # Backend testi so integracijski (Express + Prisma) in potrebujejo pravo
+    # bazo PostgreSQL, zato jo zaženemo kot servisni kontejner.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: shiftflow
+          POSTGRES_PASSWORD: shiftflow
+          POSTGRES_DB: shiftflow_api_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shiftflow -d shiftflow_api_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Samo testne vrednosti za CI (niso produkcijske skrivnosti).
+    # scripts/test.cjs ime baze v DATABASE_URL zamenja s shiftflow_api_test.
+    env:
+      DATABASE_URL: postgresql://shiftflow:shiftflow@localhost:5432/shiftflow?schema=public
+      SEED_PASSWORD: ci-test-password-123
+      JWT_SECRET: ci-test-jwt-secret-that-is-at-least-32-chars
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Test frontend (Vitest + coverage)
+        working-directory: frontend
+        run: npm run test:coverage
+
+      - name: Upload frontend coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          retention-days: 7
+
+      # Namestitvene skripte (bcrypt, prisma) so dovoljene v allowScripts v package.json.
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Test backend (migracije + seed + node:test + coverage)
+        working-directory: backend
+        run: npm run test:coverage
+
+      - name: Upload backend coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+          retention-days: 7
