@@ -25,6 +25,25 @@ function main() {
     );  
     const tsxCli = require.resolve("tsx/cli");
 
+  // `npm run test:coverage` (stikalo --coverage) vklopi merjenje pokritosti
+  // v vgrajenem testnem ogrodju Node; poročilo LCOV gre v coverage/lcov.info.
+  const coverageArgs = [];
+
+  if (process.argv.includes("--coverage")) {
+    const coverageDir = require("node:path").resolve(__dirname, "../coverage");
+    require("node:fs").mkdirSync(coverageDir, { recursive: true });
+
+    coverageArgs.push(
+      "--experimental-test-coverage",
+      "--test-coverage-include=src/**",
+      "--test-coverage-exclude=src/generated/**",
+      "--test-reporter=spec",
+      "--test-reporter-destination=stdout",
+      "--test-reporter=lcov",
+      "--test-reporter-destination=coverage/lcov.info"
+    );
+  }
+
   const commands = [
     {
       name: "Migracije testne baze",
@@ -36,7 +55,7 @@ function main() {
     },
     {
       name: "Avtomatizirani testi",
-      args: [tsxCli, "--test", "tests/*.test.ts"]
+      args: [tsxCli, "--test", ...coverageArgs, "tests/*.test.ts"]
     }
   ];
 
