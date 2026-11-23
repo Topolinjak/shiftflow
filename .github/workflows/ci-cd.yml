@@ -5,10 +5,11 @@ on:
   push:
     branches: [main]
 
-# Ob novem pushu na isto vejo/PR prekliči še tekoči zagon.
+# Ob novem pushu v PR prekliči še tekoči zagon. Zagonov na main ne prekinjamo,
+# da se deploy ne ustavi sredi nameščanja (počakajo v vrsti).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -192,3 +193,73 @@ jobs:
           name: backend-coverage
           path: backend/coverage
           retention-days: 7
+
+  deploy:
+    name: deploy
+    needs: [lint, build, test]
+    # Samo ob pushu na main (tudi merge PR-ja), nikoli ob pull_request.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    # Skrivnosti so shranjene v okolju production (Settings → Environments).
+    environment:
+      name: production
+      url: ${{ vars.FRONTEND_URL }}
+
+    # Brez checkouta: nameščamo izključno artefakte iz joba build.
+    steps:
+      - name: Download backend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: backend-package
+          path: backend-package
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: frontend-dist
+          path: frontend-dist
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend-package/package-lock.json
+
+      # Samo produkcijske odvisnosti (koda je že prevedena v dist/).
+      - name: Install backend production dependencies
+        working-directory: backend-package
+        run: npm ci --omit=dev
+
+      - name: Apply database migrations
+        working-directory: backend-package
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate deploy
+
+      - name: Deploy backend to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: backend-package
+
+      # Netlify CLI samo naloži že zgrajeni dist (brez ponovnega builda).
+      - name: Deploy frontend to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: >-
+          npx --yes netlify-cli@27.20.1 deploy
+          --prod
+          --no-build
+          --dir frontend-dist
+          --message "GitHub Actions ${{ github.sha }}"
+
+      # App Service se po namestitvi ponovno zažene, zato nekaj časa ponavljamo.
+      - name: Smoke test backend
+        run: >-
+          curl --fail --silent --show-error
+          --retry 12 --retry-delay 10 --retry-all-errors
+          "${{ vars.VITE_API_URL }}/api/health"
