@@ -118,3 +118,14 @@ prejšnje ekipe v `07-preverjanje-mvp.md`.
   backenda nastavljiv prek okoljske spremenljivke.
 - **Lokalni zagon:** vrata 5432, 3000 in 5173 so fiksna (`strictPort`), zato
   zagon ni mogoč, če jih uporablja drug projekt.
+- **Sočasna oddaja zahteve za menjavo (US-05):** ob postavitvi CI je test
+  »Sočasna oddaja ustvari samo eno odprto zahtevo«
+  (`backend/tests/swap-requests.test.ts`) občasno padel: dve hkratni zahtevi
+  za isto izmeno sta obe vrnili 201 namesto 201 in 409. Endpoint
+  `POST /api/swap-requests` najprej preveri obstoj odprte zahteve in jo šele
+  nato ustvari, zato lahko obe sočasni zahtevi preverjanje prestaneta.
+  Komentar v kodi se sklicuje na enolični indeks (napaka `P2002`), ki pa v
+  nobeni migraciji ne obstaja. Predlagan popravek je migracija z delnim
+  enoličnim indeksom `("shiftId") WHERE "status" IN ('PENDING', 'ACCEPTED')`;
+  obstoječa obravnava `P2002` bi nato že vrnila 409. Kriterij US-05 tako
+  velja za zaporedne zahteve, pri sočasnih pa ni zagotovljen.
