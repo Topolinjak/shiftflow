@@ -13,9 +13,6 @@ export function createApp(frontendUrl: string) {
 
   app.disable("x-powered-by");
 
-  // NAMERNA NAPAKA (korak 6): neuporabljena spremenljivka, da lint job pade.
-  const namernoNeuporabljena = "lint mora pasti";
-
   app.use(cors({ origin: frontendUrl }));
   app.use(express.json({ limit: "16kb" }));
 
