@@ -51,3 +51,5 @@ postgres-data/
 
 # Generirana Prisma koda
 backend/src/generated/prisma/
+# Local Netlify folder
+.netlify
