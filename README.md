@@ -1,6 +1,11 @@
 # ShiftFlow
 
+[![CI/CD](https://github.com/Topolinjak/shiftflow/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/Topolinjak/shiftflow/actions/workflows/ci-cd.yml)
+
 Spletna aplikacija za organizacijo delovnih izmen v manjših podjetjih.
+
+**Nameščena aplikacija:** https://shiftflow-gt.netlify.app
+(API: https://shiftflow-api-gt-bwekgcbqfea7aeet.centralindia-01.azurewebsites.net/api/health)
 
 ## Funkcionalnosti
 
@@ -232,6 +237,23 @@ docker compose down
 Podatki ostanejo v Docker volume-u. Sprememba gesla v `.env`
 ne spremeni gesla že inicializirane baze.
 
+## CI/CD
+
+Pipeline je opisan v [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml)
+in se zažene ob vsakem pull requestu ter ob pushu na `main`.
+
+| Faza | Kaj naredi |
+| --- | --- |
+| `lint` | ESLint za frontend in backend; pade ob vsaki napaki. |
+| `build` | Zgradi frontend (Vite, URL API-ja iz `VITE_API_URL`) in backend (`tsc`) z npm predpomnilnikom ter naloži artefakta `frontend-dist` in `backend-package`. |
+| `test` | Vitest za frontend in integracijski testi `node:test` za backend na PostgreSQL servisnem kontejnerju; poročili o pokritosti sta artefakta. |
+| `deploy` | Samo ob pushu na `main` po uspešnih `lint`, `build` in `test`: prenese artefakte (brez ponovne gradnje), izvede `prisma migrate deploy`, namesti backend na Azure App Service in frontend na Netlify ter preveri `/api/health`. |
+
+Produkcijska baza PostgreSQL teče na Neon. Skrivnosti (povezava do baze,
+publish profile, Netlify žeton) so shranjene v GitHub okolju `production`.
+Veja `main` je zaščitena: združitev zahteva PR z uspešnimi preverjanji
+`lint`, `build` in `test`.
+
 ## Razvojni proces
 
 Za vsako nalogo uporabljamo ločeno vejo in GitHub Issue.
@@ -250,3 +272,4 @@ Napredek spremljamo v GitHub Projects: To Do → Doing → Done.
 - [Wireframe-i](docs/06-wireframes.md)
 - [Arhitekturne odločitve](docs/adr/README.md)
 - [Preverjanje MVP](docs/07-preverjanje-mvp.md)
+- [Pregled prevzetega projekta](docs/08-pregled-projekta.md)
